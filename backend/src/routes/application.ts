@@ -5,5 +5,6 @@ const router = Router();
 
 router.post("/", createApplication);
 router.get("/", listApplications);
+router.delete("/:id", deleteApplication);
 
 export default router;

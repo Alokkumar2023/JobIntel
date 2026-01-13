@@ -144,6 +144,7 @@ const JobDetailPage = () => {
             skills: bj.meta?.techStack || [],
             batch: bj.meta?.batch,
             applyLink: bj.meta?.applyLink || bj.applyUrl || '#',
+            // keep applied state fetched from backend separately in JobsPage; JobDetail can also expose apply action later
             postedAt: bj.createdAt,
             applicantsCount: bj.applicantsCount || 0,
             deadline: bj.deadline || undefined,

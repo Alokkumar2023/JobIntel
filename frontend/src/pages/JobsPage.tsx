@@ -37,6 +37,7 @@ const JobsPage = () => {
   const { publishedJobs } = useJobsStore();
   
   const [backendJobs, setBackendJobs] = useState<any[]>([]);
+  const [userApplications, setUserApplications] = useState<Record<string, any>>({}); // jobId -> application
   const [loadingJobs, setLoadingJobs] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,9 +85,29 @@ const JobsPage = () => {
     }
   };
 
+  const fetchUserApplications = async () => {
+    if (!isAuthenticated || !user) return;
+    try {
+      const base = backendBase ? backendBase.replace(/\/$/, '') : '';
+      const url = base ? `${base}/api/applications?userId=${user.id}` : `/api/applications?userId=${user.id}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) return;
+      const apps = await res.json();
+      const map: Record<string, any> = {};
+      apps.forEach((a: any) => { if (a.jobId) map[String(a.jobId)] = a; });
+      setUserApplications(map);
+    } catch (e) {
+      console.warn('failed to fetch user applications', e);
+    }
+  };
+
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    fetchUserApplications();
+  }, [isAuthenticated, user]);
 
   // Poll backend periodically to get near real-time updates
   useEffect(() => {
@@ -522,12 +543,54 @@ const JobsPage = () => {
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
                       </Link>
-                      <a href={job.applyLink} target="_blank" rel="noopener noreferrer">
-                        <Button variant="accent" size="sm">
-                          Apply Now
-                          <ExternalLink className="h-4 w-4 ml-1" />
-                        </Button>
-                      </a>
+                      {!userApplications[job.id] ? (
+                        <>
+                          <a href={job.applyLink} target="_blank" rel="noopener noreferrer">
+                            <Button variant="accent" size="sm">
+                              Apply Now
+                              <ExternalLink className="h-4 w-4 ml-1" />
+                            </Button>
+                          </a>
+                          {isAuthenticated && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const base = backendBase ? backendBase.replace(/\/$/, '') : '';
+                                  const url = base ? `${base}/api/applications` : '/api/applications';
+                                  const body = { userId: user.id, jobId: job.id, appliedAt: new Date().toISOString() };
+                                  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                                  if (res.ok) {
+                                    const a = await res.json();
+                                    setUserApplications((prev) => ({ ...prev, [String(job.id)]: a }));
+                                  }
+                                } catch (e) { console.warn(e); }
+                              }}
+                            >
+                              Applied
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" disabled>
+                            Applied
+                          </Button>
+                          <Button variant="link" size="sm" onClick={async () => {
+                            try {
+                              const app = userApplications[job.id];
+                              if (!app || !app._id) return;
+                              const base = backendBase ? backendBase.replace(/\/$/, '') : '';
+                              const url = base ? `${base}/api/applications/${app._id}` : `/api/applications/${app._id}`;
+                              const res = await fetch(url, { method: 'DELETE' });
+                              if (res.ok) {
+                                setUserApplications((prev) => { const p = { ...prev }; delete p[job.id]; return p; });
+                              }
+                            } catch (e) { console.warn(e); }
+                          }}>Remove</Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
