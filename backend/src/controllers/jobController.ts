@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { Job } from "../models/Job";
 import { Company } from "../models/Company";
 import { Revenue } from "../models/Revenue";
+import { enqueueNotification } from "../queues/notificationQueue";
+import { publishRealtime } from "../utils/realtime";
 
 // AI Job Parser - Parse raw job text and extract structured data
 export async function parseJobText(req: Request, res: Response) {
@@ -170,6 +172,24 @@ export async function createJob(req: Request, res: Response) {
       console.error('Failed to create revenue record:', revenueErr);
     }
 
+    // enqueue/send notification and publish realtime event for clients
+    try {
+      const payload = {
+        type: 'job_published',
+        jobId: job._id,
+        title: job.title,
+        company: job.meta?.company || company || '',
+        postedAt: job.createdAt || new Date(),
+        body: `New job posted: ${job.title} at ${job.meta?.company || company || ''}`,
+      };
+      // enqueue email/whatsapp/telegram etc
+      await enqueueNotification(payload);
+      // publish to realtime channel for SSE/clients
+      publishRealtime('realtime:notifications', payload);
+    } catch (notifErr) {
+      console.warn('failed to publish job notification', notifErr?.message || notifErr);
+    }
+
     return res.status(201).json(job);
   } catch (err) {
     return res.status(500).json({ error: "failed to create job", details: err });
@@ -193,6 +213,22 @@ export async function updateJob(req: Request, res: Response) {
     const updates = req.body;
     const job = await Job.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true }).lean();
     if (!job) return res.status(404).json({ error: "not found" });
+
+    // publish realtime event on significant updates
+    try {
+      const payload = {
+        type: 'job_updated',
+        jobId: job._id,
+        title: job.title,
+        company: job.meta?.company || '',
+        status: job.status,
+        postedAt: job.postedAt || job.createdAt,
+      };
+      await enqueueNotification(payload);
+      publishRealtime('realtime:notifications', payload);
+    } catch (err) {
+      console.warn('failed to publish job update notification', err?.message || err);
+    }
     return res.json(job);
   } catch (err) {
     return res.status(500).json({ error: "failed to update job", details: err });
@@ -204,6 +240,14 @@ export async function deleteJob(req: Request, res: Response) {
   try {
     const job = await Job.findByIdAndDelete(req.params.id).lean();
     if (!job) return res.status(404).json({ error: "not found" });
+
+    try {
+      const payload = { type: 'job_deleted', jobId: job._id, title: job.title };
+      await enqueueNotification(payload);
+      publishRealtime('realtime:notifications', payload);
+    } catch (err) {
+      console.warn('failed to publish job delete notification', err?.message || err);
+    }
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "failed to delete job", details: err });

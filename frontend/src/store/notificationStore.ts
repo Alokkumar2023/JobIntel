@@ -102,3 +102,29 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     });
   },
 }));
+
+// Open SSE connection for realtime notifications (client-side only)
+if (typeof window !== 'undefined' && (window as any).EventSource) {
+  try {
+    const es = new EventSource('/api/notifications/stream');
+    es.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        // convert payload to UserNotification shape
+        const store = useNotificationStore.getState();
+        store.addNotification({
+          title: payload.title || 'Notification',
+          message: payload.body || payload.message || '',
+          type: 'info',
+        });
+      } catch (err) {
+        // ignore parse errors
+      }
+    };
+    es.onerror = () => {
+      es.close();
+    };
+  } catch (err) {
+    // ignore
+  }
+}
