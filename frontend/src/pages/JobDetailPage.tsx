@@ -114,7 +114,7 @@ const JobDetailPage = () => {
             requirements: [],
             skills: bj.meta?.techStack || [],
             batch: bj.meta?.batch,
-            applyLink: bj.applyUrl || '#',
+            applyLink: bj.meta?.applyLink || bj.applyUrl || '#',
             postedAt: bj.createdAt,
             applicantsCount: bj.applicantsCount || 0,
             deadline: bj.deadline || undefined,

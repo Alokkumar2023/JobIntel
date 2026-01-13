@@ -120,7 +120,7 @@ const JobsPage = () => {
         requirements: [],
         skills: pj.techStack,
         batch: pj.batch,
-        applyLink: pj.applyUrl || '#',
+        applyLink: (pj as any).applyLink || (pj as any).applyUrl || '#',
         postedAt: pj.createdAt,
       })) as Job[];
 
@@ -144,7 +144,7 @@ const JobsPage = () => {
       requirements: [],
       skills: bj.meta?.techStack || [],
       batch: bj.meta?.batch,
-      applyLink: bj.applyUrl || '#',
+      applyLink: bj.meta?.applyLink || bj.applyUrl || '#',
       postedAt: bj.createdAt,
     })) as Job[];
 

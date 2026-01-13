@@ -72,11 +72,15 @@ export async function parseJobText(req: Request, res: Response) {
     const eligibility = eligMatch ? eligMatch[1].trim().replace(/[🎓]/g, "").trim() : "Graduates";
 
     // Extract Batch info
-    const batchMatch = rawText.match(/(?:BATCH|Batch|Year)\s+(\d{4})\s*(?:\||and|&)?\s*(\d{4})?/i);
+    // Extract Batch info: try explicit phrases then fallback to any 4-digit year matches
     const batch: string[] = [];
+    const batchMatch = rawText.match(/(?:Eligible Batch|BATCH|Batch|Year)\s*[:\-]?\s*(\d{4})(?:\s*[&,\-]\s*(\d{4}))?/i);
     if (batchMatch) {
       batch.push(batchMatch[1]);
       if (batchMatch[2]) batch.push(batchMatch[2]);
+    } else {
+      const years = Array.from(rawText.matchAll(/\b(20\d{2})\b/g)).map(m => m[1]);
+      years.forEach(y => { if (!batch.includes(y)) batch.push(y); });
     }
 
     // Generate tags
@@ -103,6 +107,11 @@ export async function parseJobText(req: Request, res: Response) {
     // Generate description from raw text
     const description = rawText.substring(0, 500) + (rawText.length > 500 ? "..." : "");
 
+    // extract possible application link(s)
+    const urlRegex = /(https?:\/\/[^\s)]+)/gi;
+    const urls = Array.from(rawText.matchAll(urlRegex)).map((m: any) => m[1]);
+    const applyLink = urls.length > 0 ? (urls.find(u => /apply|jobs|ats|careers|applynow/i.test(u)) || urls[0]) : undefined;
+
     return res.json({
       title,
       company,
@@ -116,6 +125,7 @@ export async function parseJobText(req: Request, res: Response) {
       eligibility: eligibility || undefined,
       experience: experience || undefined,
       batch: batch.length > 0 ? batch : undefined,
+      applyLink: applyLink || undefined,
     });
   } catch (err) {
     return res.status(500).json({ error: "Failed to parse job text", details: err });
@@ -123,7 +133,7 @@ export async function parseJobText(req: Request, res: Response) {
 }
 export async function createJob(req: Request, res: Response) {
   try {
-    const { title, companyId, rawHtml, status, meta, description, location, isRemote, techStack, tags, eligibility, experience, batch, company, salary, stipend, rawText } = req.body;
+    const { title, companyId, rawHtml, status, meta, description, location, isRemote, techStack, tags, eligibility, experience, batch, company, salary, stipend, rawText, applyLink } = req.body;
     
     // If company name is provided, create/get company
     let companyDocId = companyId;
@@ -153,6 +163,7 @@ export async function createJob(req: Request, res: Response) {
         batch,
         salary,
         stipend,
+        applyLink: applyLink || (meta && meta.applyLink) || undefined,
       },
     });
 

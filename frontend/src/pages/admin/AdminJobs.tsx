@@ -47,25 +47,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { adminJobs } from '@/data/adminMockData';
 import { cn } from '@/lib/utils';
-import { parseJobText } from '@/services/aiJobParser';
+import { parseJobText, ParsedJobData } from '@/services/aiJobParser';
 import { JobPreviewDialog } from '@/components/admin/JobPreviewDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useJobsStore } from '@/store/jobsStore';
 
-interface ParsedJobData {
-  title: string;
-  company: string;
-  description: string;
-  location: string;
-  isRemote: boolean;
-  salary?: string;
-  stipend?: string;
-  techStack: string[];
-  tags: string[];
-  eligibility?: string;
-  experience?: string;
-  batch?: string[];
-}
+// use ParsedJobData from aiJobParser
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -262,46 +249,32 @@ export default function AdminJobs() {
             eligibility: parsedJob.eligibility,
             experience: parsedJob.experience,
             batch: parsedJob.batch,
+            applyLink: (parsedJob as any).applyLink || undefined,
             status: 'active',
             rawText: rawJobText,
           }),
         });
-
         if (response.ok) {
-          console.log('Job published to backend');
+          const created = await response.json();
+          console.log('Job published to backend', created._id || created.id);
+          // refresh backend jobs listing in admin
+          fetchBackendJobs();
+          setIsPreviewOpen(false);
+          setRawJobText('');
+          setParsedJob(null);
+          toast({
+            title: 'Job Published! 🎉',
+            description: `"${parsedJob.title}" has been published and is now visible in the jobs listing.`,
+            duration: 4000,
+          });
+        } else {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Backend returned ${response.status} ${text}`);
         }
       } catch (backendErr) {
-        console.log('Backend not available, saving locally:', backendErr);
+        console.log('Backend not available or failed; not saving locally:', backendErr);
+        toast({ title: 'Publish failed', description: String(backendErr), variant: 'destructive' });
       }
-
-      // Always save to local store for immediate UI update
-      publishJob({
-        title: parsedJob.title,
-        company: parsedJob.company,
-        description: parsedJob.description,
-        location: parsedJob.location,
-        isRemote: parsedJob.isRemote,
-        salary: parsedJob.salary,
-        stipend: parsedJob.stipend,
-        techStack: parsedJob.techStack,
-        tags: parsedJob.tags,
-        eligibility: parsedJob.eligibility,
-        experience: parsedJob.experience,
-        batch: parsedJob.batch,
-        status: 'active',
-        rawText: rawJobText,
-      });
-      
-      setIsPreviewOpen(false);
-      setRawJobText('');
-      setParsedJob(null);
-      
-      // Show success message
-      toast({
-        title: 'Job Published! 🎉',
-        description: `"${parsedJob.title}" has been published and is now visible in the jobs listing.`,
-        duration: 4000,
-      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to publish job');
       toast({
