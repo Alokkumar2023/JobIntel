@@ -16,6 +16,7 @@ export interface ParsedJobData {
   eligibility?: string;
   experience?: string;
   batch?: string[];
+  applyLink?: string;
 }
 
 const TECH_KEYWORDS = [
@@ -43,7 +44,14 @@ export const parseJobText = (rawText: string): ParsedJobData => {
 
   // Extract Company
   const companyMatch = rawText.match(/(?:Company|🏢)\s*[:\-]?\s*([^\n]+)/i);
-  const company = companyMatch ? companyMatch[1].trim() : 'Company Name';
+  let company = companyMatch ? companyMatch[1].trim() : '';
+  // Fallback: sometimes the job title starts with "Company – Role" or "Company - Role"
+  if (!company) {
+    const firstLine = lines[0] || '';
+    const dashMatch = firstLine.match(/^([A-Z][A-Za-z0-9&\-.\s]{2,80})\s*[-–—:\|]/);
+    if (dashMatch) company = dashMatch[1].trim();
+  }
+  if (!company) company = 'Company Name';
 
   // Extract Job Title
   const titleMatch = rawText.match(/(?:Role|Position|Job Title|👨‍💻)\s*[:\-]?\s*([^\n]+)/i);
@@ -65,7 +73,9 @@ export const parseJobText = (rawText: string): ParsedJobData => {
   let salary = '';
   let stipend = '';
   
-  if (salaryText.toLowerCase().includes('stipend') || salaryText.includes('LPA') || salaryText.includes('₹')) {
+  // Treat explicit 'stipend' or monthly terms as stipend, otherwise treat amounts (₹, LPA, CTC) as salary
+  const lowerSalary = salaryText.toLowerCase();
+  if (lowerSalary.includes('stipend') || /per\s*(month|mo|pm|monthly)/i.test(salaryText) ) {
     stipend = salaryText;
   } else if (salaryText) {
     salary = salaryText;
@@ -87,12 +97,15 @@ export const parseJobText = (rawText: string): ParsedJobData => {
   const eligMatch = rawText.match(/(?:Eligibility|Qualifications|Requirements|🎓)\s*[:\-]?\s*([^\n]+)/i);
   const eligibility = eligMatch ? eligMatch[1].trim().replace(/[🎓]/g, '').trim() : 'Graduates';
 
-  // Extract Batch info
-  const batchMatch = rawText.match(/(?:BATCH|Batch|Year)\s+(\d{4})\s*(?:\||and|&)?\s*(\d{4})?/i);
+  // Extract Batch info: try explicit phrases then fallback to any 4-digit year matches
   const batch: string[] = [];
+  const batchMatch = rawText.match(/(?:Eligible Batch|BATCH|Batch|Year)\s*[:\-]?\s*(\d{4})(?:\s*[&,\-]\s*(\d{4}))?/i);
   if (batchMatch) {
     batch.push(batchMatch[1]);
     if (batchMatch[2]) batch.push(batchMatch[2]);
+  } else {
+    const years = Array.from(rawText.matchAll(/\b(20\d{2})\b/g)).map(m => m[1]);
+    years.forEach(y => { if (!batch.includes(y)) batch.push(y); });
   }
 
   // Generate tags
@@ -116,8 +129,28 @@ export const parseJobText = (rawText: string): ParsedJobData => {
     tags.push('On-site');
   }
 
+  // Auto-tag company name (useful for filtering/search)
+  if (company && company !== 'Company Name') {
+    tags.push(company);
+  }
+
+  // Add batch years as tags (e.g., 2025, 2026)
+  if (batch && batch.length > 0) {
+    batch.forEach((b) => {
+      if (b && !tags.includes(b)) tags.push(b);
+    });
+  }
+
   // Generate description from raw text
   const description = rawText.substring(0, 500) + (rawText.length > 500 ? '...' : '');
+
+  // Extract first likely application link (look for URLs containing apply/jobs/ats or any URL)
+  const urlRegex = /(https?:\/\/[^\s)]+)/gi;
+  let applyLink: string | undefined;
+  const urls = Array.from(rawText.matchAll(urlRegex)).map(m => m[1]);
+  if (urls.length > 0) {
+    applyLink = urls.find(u => /apply|jobs|ats|careers|applynow/i.test(u)) || urls[0];
+  }
 
   return {
     title,
@@ -132,5 +165,6 @@ export const parseJobText = (rawText: string): ParsedJobData => {
     eligibility: eligibility || undefined,
     experience: experience || undefined,
     batch: batch.length > 0 ? batch : undefined,
+    applyLink: applyLink || undefined,
   };
 };

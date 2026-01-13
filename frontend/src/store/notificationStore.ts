@@ -48,8 +48,9 @@ const mockNotifications: UserNotification[] = [
 ];
 
 export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: mockNotifications,
-  unreadCount: mockNotifications.filter(n => !n.read).length,
+  // Start with no demo notifications — show only realtime/backend notifications
+  notifications: [],
+  unreadCount: 0,
 
   addNotification: (notification) => {
     const newNotification: UserNotification = {

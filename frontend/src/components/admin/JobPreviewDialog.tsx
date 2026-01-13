@@ -81,6 +81,12 @@ export const JobPreviewDialog = ({
                       <span className="text-sm font-semibold">{parsedJob.salary}</span>
                     </div>
                   )}
+                  {parsedJob.applyLink && (
+                    <div className="col-span-2">
+                      <p className="text-sm font-medium text-muted-foreground">Application Link</p>
+                      <a href={parsedJob.applyLink} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline break-all">{parsedJob.applyLink}</a>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

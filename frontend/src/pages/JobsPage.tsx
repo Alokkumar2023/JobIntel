@@ -98,6 +98,39 @@ const JobsPage = () => {
 
   // Combine mock jobs with published jobs (local store and backend)
   const allJobs = useMemo(() => {
+    const parseSalaryString = (s?: string) => {
+      if (!s) return undefined;
+      try {
+        const raw = String(s);
+        const cleaned = raw.replace(/,/g, '').replace(/₹|Rs\.?/gi, '').trim().toLowerCase();
+        const numM = cleaned.match(/([0-9]+(?:\.[0-9]+)?)/);
+        if (!numM) return undefined;
+        const n = parseFloat(numM[1]);
+        // if lpa/lakh present
+        if (/lpa|lakh|lac|lacs|per annum|per year/i.test(raw)) {
+          const val = Math.round(n * 100000);
+          return { min: val, max: val, currency: 'INR', period: 'yearly' as const };
+        }
+        // monthly
+        if (/per month|monthly|pm/i.test(raw)) {
+          const val = Math.round(n * 1000);
+          return { min: val, max: val, currency: 'INR', period: 'monthly' as const };
+        }
+        // hourly
+        if (/per hour|hourly|hr/i.test(raw)) {
+          return { min: n, max: n, currency: 'INR', period: 'hourly' as const };
+        }
+        // if number looks small (<1000) treat as LPA
+        if (n < 1000) {
+          const val = Math.round(n * 100000);
+          return { min: val, max: val, currency: 'INR', period: 'yearly' as const };
+        }
+        // fallback: treat as raw rupee amount
+        return { min: Math.round(n), max: Math.round(n), currency: 'INR', period: 'yearly' as const };
+      } catch (e) {
+        return undefined;
+      }
+    };
     const convertedPublished = publishedJobs
       .filter(pj => pj.status === 'active')
       .map((pj) => ({
@@ -128,7 +161,7 @@ const JobsPage = () => {
       id: bj._id,
       title: bj.title,
       company: {
-        name: bj.meta?.company || 'Company',
+        name: bj.meta?.company || (bj.company && bj.company.name) || 'Company',
         logo: undefined,
         description: '',
         website: '',
@@ -139,7 +172,7 @@ const JobsPage = () => {
       type: 'full-time' as JobType,
       experienceLevel: 'fresher' as ExperienceLevel,
       experienceRange: { min: 0, max: 3 },
-      salary: bj.meta?.salary ? { min: 0, max: 100000, currency: 'INR' } : undefined,
+      salary: bj.meta?.salary ? parseSalaryString(bj.meta.salary) : undefined,
       description: bj.description,
       requirements: [],
       skills: bj.meta?.techStack || [],

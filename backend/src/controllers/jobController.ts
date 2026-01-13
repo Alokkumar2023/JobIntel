@@ -20,7 +20,14 @@ export async function parseJobText(req: Request, res: Response) {
 
     // Extract Company
     const companyMatch = rawText.match(/(?:Company|🏢)\s*[:\-]?\s*([^\n]+)/i);
-    const company = companyMatch ? companyMatch[1].trim() : "Company Name";
+    let company = companyMatch ? companyMatch[1].trim() : '';
+    // Fallback: sometimes the first line is "Company – Role" or "Company - Role"
+    if (!company) {
+      const firstLine = lines[0] || '';
+      const dashMatch = firstLine.match(/^([A-Z][A-Za-z0-9&\-.\s]{2,80})\s*[-–—:\|]/);
+      if (dashMatch) company = dashMatch[1].trim();
+    }
+    if (!company) company = 'Company Name';
 
     // Extract Job Title
     const titleMatch = rawText.match(/(?:Role|Position|Job Title|👨‍💻)\s*[:\-]?\s*([^\n]+)/i);
@@ -36,12 +43,16 @@ export async function parseJobText(req: Request, res: Response) {
 
     // Extract Salary/Stipend
     const salaryMatch = rawText.match(/(?:Salary|Stipend|CTC|Pay|💰)\s*[:\-]?\s*([^\n]+)/i);
-    const salaryText = salaryMatch ? salaryMatch[1].trim().replace(/[💰]/g, "").trim() : "";
+    let salaryText = salaryMatch ? salaryMatch[1].trim().replace(/[💰]/g, "").trim() : "";
+    // Trim salaryText if other segments follow on same line (location, link etc.)
+    salaryText = salaryText.split(/\b(Location|📍|https?:|🔗)/i)[0].trim();
 
     let salary = "";
     let stipend = "";
 
-    if (salaryText.toLowerCase().includes("stipend") || salaryText.includes("LPA") || salaryText.includes("₹")) {
+    // Treat explicit 'stipend' or monthly terms as stipend, otherwise treat amounts (₹, LPA, CTC) as salary
+    const lowerSalary = salaryText.toLowerCase();
+    if (lowerSalary.includes("stipend") || /per\s*(month|mo|pm|monthly)/i.test(salaryText)) {
       stipend = salaryText;
     } else if (salaryText) {
       salary = salaryText;
@@ -104,6 +115,14 @@ export async function parseJobText(req: Request, res: Response) {
       tags.push("On-site");
     }
 
+    // Auto-tag company name (useful for filtering/search)
+    if (company && company !== 'Company Name') tags.push(company);
+
+    // Add batch years as tags
+    if (batch && batch.length > 0) {
+      batch.forEach((b) => { if (b && !tags.includes(b)) tags.push(b); });
+    }
+
     // Generate description from raw text
     const description = rawText.substring(0, 500) + (rawText.length > 500 ? "..." : "");
 
@@ -137,6 +156,7 @@ export async function createJob(req: Request, res: Response) {
     
     // If company name is provided, create/get company
     let companyDocId = companyId;
+    let companyName: string | undefined = undefined;
     if (company && !companyId) {
       const companyDoc = await Company.findOneAndUpdate(
         { name: company },
@@ -144,6 +164,9 @@ export async function createJob(req: Request, res: Response) {
         { upsert: true, new: true }
       );
       companyDocId = companyDoc._id;
+      companyName = companyDoc.name;
+    } else if (company) {
+      companyName = company;
     }
 
     const job = await Job.create({
@@ -164,6 +187,7 @@ export async function createJob(req: Request, res: Response) {
         salary,
         stipend,
         applyLink: applyLink || (meta && meta.applyLink) || undefined,
+        company: companyName || (meta && meta.company) || undefined,
       },
     });
 

@@ -87,6 +87,35 @@ const JobDetailPage = () => {
     }
 
     // If not found locally, fetch from backend by ID
+    const parseSalaryString = (s?: string) => {
+      if (!s) return undefined;
+      try {
+        const raw = String(s);
+        const cleaned = raw.replace(/,/g, '').replace(/₹|Rs\.?/gi, '').trim().toLowerCase();
+        const numM = cleaned.match(/([0-9]+(?:\.[0-9]+)?)/);
+        if (!numM) return undefined;
+        const n = parseFloat(numM[1]);
+        if (/lpa|lakh|lac|lacs|per annum|per year/i.test(raw)) {
+          const val = Math.round(n * 100000);
+          return { min: val, max: val, currency: 'INR', period: 'yearly' as const };
+        }
+        if (/per month|monthly|pm/i.test(raw)) {
+          const val = Math.round(n * 1000);
+          return { min: val, max: val, currency: 'INR', period: 'monthly' as const };
+        }
+        if (/per hour|hourly|hr/i.test(raw)) {
+          return { min: n, max: n, currency: 'INR', period: 'hourly' as const };
+        }
+        if (n < 1000) {
+          const val = Math.round(n * 100000);
+          return { min: val, max: val, currency: 'INR', period: 'yearly' as const };
+        }
+        return { min: Math.round(n), max: Math.round(n), currency: 'INR', period: 'yearly' as const };
+      } catch (e) {
+        return undefined;
+      }
+    };
+
     const fetchJob = async () => {
       if (!id) return;
       setLoading(true);
@@ -109,7 +138,7 @@ const JobDetailPage = () => {
             type: 'full-time',
             experienceLevel: 'fresher',
             experienceRange: { min: 0, max: 3 },
-            salary: bj.meta?.salary ? { min: 0, max: 100000, currency: 'INR' } : undefined,
+            salary: bj.meta?.salary ? parseSalaryString(bj.meta.salary) : undefined,
             description: bj.description || bj.rawHtml || 'No description available',
             requirements: [],
             skills: bj.meta?.techStack || [],
