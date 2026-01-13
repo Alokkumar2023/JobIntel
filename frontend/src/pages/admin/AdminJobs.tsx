@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -94,10 +94,68 @@ export default function AdminJobs() {
   
   const { publishedJobs, publishJob } = useJobsStore();
 
-  const filteredJobs = adminJobs.filter(
+  const [backendJobs, setBackendJobs] = useState<any[]>([]);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [loadingBackend, setLoadingBackend] = useState(false);
+
+  const fetchBackendJobs = async () => {
+    setLoadingBackend(true);
+    setBackendError(null);
+    try {
+      const response = await fetch('/api/jobs', { cache: 'no-store' });
+      if (response.ok) {
+        const jobs = await response.json();
+        setBackendJobs(jobs || []);
+        console.debug('Admin: fetched', Array.isArray(jobs) ? jobs.length : 0, 'backend jobs');
+      } else {
+        setBackendJobs([]);
+        setBackendError(`Status ${response.status}`);
+      }
+    } catch (err: any) {
+      setBackendJobs([]);
+      setBackendError(err?.message || String(err));
+    } finally {
+      setLoadingBackend(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendJobs();
+  }, []);
+
+  const combinedJobs = useMemo(() => {
+    // map publishedJobs from store to admin row shape
+    const fromPublished = publishedJobs.map((pj) => ({
+      id: pj.id,
+      title: pj.title,
+      company: pj.company,
+      status: pj.status || 'active',
+      source: 'manual',
+      applicants: pj.applicantsCount || 0,
+      postedAt: pj.createdAt,
+      deadline: pj.deadline || null,
+    }));
+
+    const fromBackend = backendJobs.map((bj: any) => ({
+      id: bj._id || bj.id,
+      title: bj.title,
+      company: bj.meta?.company || (typeof bj.company === 'string' ? bj.company : 'Company'),
+      status: bj.status || 'active',
+      source: bj.source || (bj.meta?.source ? bj.meta.source : 'api'),
+      applicants: bj.applicantsCount || 0,
+      postedAt: bj.createdAt || bj.postedAt,
+      deadline: bj.deadline || null,
+    }));
+
+    const result = [...adminJobs, ...fromPublished, ...fromBackend];
+    console.debug('Admin: combined jobs counts', { mock: adminJobs.length, published: fromPublished.length, backend: fromBackend.length, total: result.length });
+    return result;
+  }, [publishedJobs, backendJobs]);
+
+  const filteredJobs = combinedJobs.filter(
     (job) =>
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase())
+      (String(job.company) || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleAiParse = async () => {
