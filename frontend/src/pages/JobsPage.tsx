@@ -64,6 +64,7 @@ const JobsPage = () => {
         try {
           const jobs = await response.json();
           setBackendJobs(jobs);
+          console.debug('fetchJobs: retrieved', Array.isArray(jobs) ? jobs.length : 0, 'jobs from backend');
         } catch (jsonErr) {
           console.warn('Backend returned invalid JSON, using local store only');
           setBackendJobs([]);
@@ -85,6 +86,14 @@ const JobsPage = () => {
 
   useEffect(() => {
     fetchJobs();
+  }, []);
+
+  // Poll backend periodically to get near real-time updates
+  useEffect(() => {
+    const iv = setInterval(() => {
+      fetchJobs();
+    }, 10000); // every 10s
+    return () => clearInterval(iv);
   }, []);
 
   // Combine mock jobs with published jobs (local store and backend)
@@ -139,7 +148,9 @@ const JobsPage = () => {
       postedAt: bj.createdAt,
     })) as Job[];
 
-    return [...mockJobs, ...convertedPublished, ...convertedBackendJobs];
+    const result = [...mockJobs, ...convertedPublished, ...convertedBackendJobs];
+    console.debug('allJobs: mock=', mockJobs.length, 'published=', convertedPublished.length, 'backend=', convertedBackendJobs.length, 'total=', result.length);
+    return result;
   }, [publishedJobs, backendJobs]);
 
   const jobTypes: { value: JobType; label: string }[] = [
@@ -203,8 +214,9 @@ const JobsPage = () => {
       jobs.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
     }
 
+    console.debug('filteredJobs: all=', allJobs.length, 'result=', jobs.length);
     return jobs;
-  }, [searchQuery, locationFilter, typeFilters, experienceFilters, remoteOnly, sortBy, user]);
+  }, [searchQuery, locationFilter, typeFilters, experienceFilters, remoteOnly, sortBy, user, allJobs]);
 
   const toggleTypeFilter = (type: JobType) => {
     setTypeFilters((prev) =>

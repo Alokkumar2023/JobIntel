@@ -123,6 +123,71 @@ export default function AdminJobs() {
     fetchBackendJobs();
   }, []);
 
+  // Handlers for admin actions
+  const handleDelete = async (id: string, source?: string) => {
+    try {
+      if (source === 'manual') {
+        // local store
+        // publishedJobs in store have numeric-ish ids (string timestamps)
+        // try remove
+        const { removeJob } = useJobsStore.getState();
+        removeJob(id);
+        toast({ title: 'Deleted locally', description: 'Job removed from local store' });
+        // also refetch backend to be safe
+        fetchBackendJobs();
+        return;
+      }
+
+      const resp = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      if (resp.ok) {
+        toast({ title: 'Deleted', description: 'Job deleted from backend' });
+        fetchBackendJobs();
+      } else {
+        toast({ title: 'Delete failed', description: `Status ${resp.status}`, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: String(err), variant: 'destructive' });
+    }
+  };
+
+  const handleApprove = async (id: string, source?: string) => {
+    try {
+      if (source === 'manual') {
+        useJobsStore.getState().updateJobStatus(id, 'active');
+        toast({ title: 'Approved locally' });
+        return;
+      }
+      const resp = await fetch(`/api/jobs/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
+      if (resp.ok) {
+        toast({ title: 'Approved' });
+        fetchBackendJobs();
+      } else {
+        toast({ title: 'Approve failed', description: `Status ${resp.status}`, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: String(err), variant: 'destructive' });
+    }
+  };
+
+  const handleReject = async (id: string, source?: string) => {
+    try {
+      if (source === 'manual') {
+        useJobsStore.getState().updateJobStatus(id, 'rejected');
+        toast({ title: 'Rejected locally' });
+        return;
+      }
+      const resp = await fetch(`/api/jobs/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'rejected' }) });
+      if (resp.ok) {
+        toast({ title: 'Rejected' });
+        fetchBackendJobs();
+      } else {
+        toast({ title: 'Reject failed', description: `Status ${resp.status}`, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: String(err), variant: 'destructive' });
+    }
+  };
+
   const combinedJobs = useMemo(() => {
     // map publishedJobs from store to admin row shape
     const fromPublished = publishedJobs.map((pj) => ({
@@ -316,25 +381,25 @@ export default function AdminJobs() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{adminJobs.filter(j => j.status === 'pending').length}</div>
+            <div className="text-2xl font-bold text-foreground">{combinedJobs.filter(j => j.status === 'pending').length}</div>
             <p className="text-sm text-muted-foreground">Pending Approval</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{adminJobs.filter(j => j.status === 'active').length}</div>
+            <div className="text-2xl font-bold text-foreground">{combinedJobs.filter(j => j.status === 'active').length}</div>
             <p className="text-sm text-muted-foreground">Active Jobs</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{adminJobs.reduce((acc, j) => acc + j.applicants, 0)}</div>
+            <div className="text-2xl font-bold text-foreground">{combinedJobs.reduce((acc, j) => acc + (j.applicants || 0), 0)}</div>
             <p className="text-sm text-muted-foreground">Total Applicants</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{adminJobs.filter(j => j.source === 'crawler').length}</div>
+            <div className="text-2xl font-bold text-foreground">{combinedJobs.filter(j => j.source === 'crawler').length}</div>
             <p className="text-sm text-muted-foreground">From Crawlers</p>
           </CardContent>
         </Card>
@@ -413,18 +478,18 @@ export default function AdminJobs() {
                           {job.status === 'pending' && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-green-600">
+                              <DropdownMenuItem className="text-green-600" onSelect={() => handleApprove(job.id, job.source)}>
                                 <Check className="mr-2 h-4 w-4" />
                                 Approve
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem className="text-red-600" onSelect={() => handleReject(job.id, job.source)}>
                                 <X className="mr-2 h-4 w-4" />
                                 Reject
                               </DropdownMenuItem>
                             </>
                           )}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(job.id, job.source)}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
