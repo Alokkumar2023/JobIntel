@@ -28,6 +28,7 @@ import { mockJobs } from '@/data/mockData';
 import { useAuthStore } from '@/store/authStore';
 import { useJobsStore } from '@/store/jobsStore';
 import { useToast } from '@/hooks/use-toast';
+import { useApplicationStore } from '@/store/applicationStore';
 
 const JobDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -159,6 +160,29 @@ const JobDetailPage = () => {
 
     fetchJob();
   }, [id, publishedJob, mockJob]);
+
+  const appStore = useApplicationStore();
+  const applied = appStore.applications[String(id)];
+
+  const handleAppliedToggle = async () => {
+    if (!isAuthenticated || !user) return;
+    try {
+      const base = (import.meta as any).env?.VITE_BACKEND_URL || '';
+      const applyUrl = base ? `${base.replace(/\/$/, '')}/api/applications` : '/api/applications';
+      if (!applied) {
+        const res = await fetch(applyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, jobId: id, appliedAt: new Date().toISOString() }) });
+        if (res.ok) {
+          const a = await res.json();
+          appStore.addOrUpdateApplication(a);
+        }
+      } else {
+        const appId = applied._id || applied.id;
+        const delUrl = base ? `${base.replace(/\/$/, '')}/api/applications/${appId}` : `/api/applications/${appId}`;
+        const res = await fetch(delUrl, { method: 'DELETE' });
+        if (res.ok) appStore.removeApplicationByJobId(id as string);
+      }
+    } catch (e) { console.warn(e); }
+  };
 
   const job = jobData;
 
@@ -319,6 +343,13 @@ const JobDetailPage = () => {
                   <ExternalLink className="h-4 w-4 ml-2" />
                 </Button>
               </a>
+              {isAuthenticated && (
+                <div className="mt-2">
+                  <Button variant={applied ? 'outline' : 'secondary'} onClick={handleAppliedToggle}>
+                    {applied ? 'Applied' : 'Applied'}
+                  </Button>
+                </div>
+              )}
               {job.deadline && (
                 <p className="text-sm text-muted-foreground">
                   Deadline: <span className="font-medium text-warning-foreground">{new Date(job.deadline).toLocaleDateString()}</span>

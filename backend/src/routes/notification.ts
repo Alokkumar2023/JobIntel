@@ -16,7 +16,7 @@ router.get('/stream', async (req, res) => {
 	res.flushHeaders && res.flushHeaders();
 
 	const sub = new IORedis(REDIS_URL);
-	const channel = 'realtime:notifications';
+	const channels = ['realtime:notifications', 'realtime:applications', 'realtime:users'];
 
 	const onMessage = (_chan: string, message: string) => {
 		try {
@@ -26,12 +26,13 @@ router.get('/stream', async (req, res) => {
 		}
 	};
 
-	await sub.subscribe(channel);
+	await sub.subscribe(...channels);
 	sub.on('message', onMessage);
 
 	req.on('close', () => {
 		sub.removeListener('message', onMessage);
-		sub.unsubscribe(channel).finally(() => sub.disconnect());
+		// unsubscribe from all subscribed channels then disconnect
+		sub.unsubscribe(...channels).finally(() => sub.disconnect());
 	});
 });
 

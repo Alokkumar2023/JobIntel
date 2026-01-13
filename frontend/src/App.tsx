@@ -24,6 +24,8 @@ import AdminCrawlers from "./pages/admin/AdminCrawlers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminRevenue from "./pages/admin/AdminRevenue";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminSkills from "./pages/admin/AdminSkills";
+import AdminProfileFields from "./pages/admin/AdminProfileFields";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +71,8 @@ const AppContent = () => {
         <Route index element={<AdminDashboard />} />
         <Route path="jobs" element={<AdminJobs />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="profile-fields" element={<AdminProfileFields />} />
+        <Route path="skills" element={<AdminSkills />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="referrals" element={<AdminReferrals />} />
         <Route path="crawlers" element={<AdminCrawlers />} />

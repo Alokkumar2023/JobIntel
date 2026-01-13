@@ -13,6 +13,15 @@ import {
   getRevenueAnalytics,
   getNotifications,
 } from '../controllers/adminController';
+import {
+  listAdminSkills,
+  createAdminSkill,
+  deleteAdminSkill,
+  listProfileFields,
+  createProfileField,
+  updateProfileField,
+  deleteProfileField,
+} from '../controllers/adminSettingsController';
 
 const router = express.Router();
 
@@ -30,5 +39,16 @@ router.get('/reports/revenue', authenticateToken, requireRole('admin'), revenueR
 router.get('/audit', authenticateToken, requireRole('admin'), auditLogs);
 router.delete('/gdpr/delete-user/:id', authenticateToken, requireRole('admin'), gdprDeleteUser);
 router.post('/scrape/run', authenticateToken, requireRole('admin'), runCrawlers);
+
+// Admin-managed skills
+router.get('/skills', authenticateToken, requireRole('admin'), listAdminSkills);
+router.post('/skills', authenticateToken, requireRole('admin'), createAdminSkill);
+router.delete('/skills/:id', authenticateToken, requireRole('admin'), deleteAdminSkill);
+
+// Admin-managed profile fields
+router.get('/profile-fields', authenticateToken, requireRole('admin'), listProfileFields);
+router.post('/profile-fields', authenticateToken, requireRole('admin'), createProfileField);
+router.put('/profile-fields/:id', authenticateToken, requireRole('admin'), updateProfileField);
+router.delete('/profile-fields/:id', authenticateToken, requireRole('admin'), deleteProfileField);
 
 export default router;

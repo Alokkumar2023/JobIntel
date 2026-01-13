@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { useApplicationStore } from './applicationStore';
+import { useAuthStore } from '@/store/authStore';
 
 export interface UserNotification {
   id: string;
@@ -111,8 +113,40 @@ if (typeof window !== 'undefined' && (window as any).EventSource) {
     es.onmessage = (ev) => {
       try {
         const payload = JSON.parse(ev.data);
-        // convert payload to UserNotification shape
         const store = useNotificationStore.getState();
+        // route application events to application store
+        if (payload && payload.type && payload.type.startsWith('application_')) {
+          const auth = useAuthStore.getState();
+          const appStore = useApplicationStore.getState();
+          // only update for current user
+          if (payload.userId && auth.user && String(payload.userId) === String(auth.user.id)) {
+            if (payload.type === 'application_created') {
+              appStore.addOrUpdateApplication({ _id: payload.applicationId, jobId: payload.jobId, userId: payload.userId, createdAt: payload.createdAt });
+            } else if (payload.type === 'application_deleted') {
+              appStore.removeApplicationByJobId(payload.jobId);
+            }
+          }
+          // also add a small notification
+          store.addNotification({ title: payload.type, message: payload.body || payload.message || '', type: 'info' });
+          return;
+        }
+
+        // if admin-managed skills or profile fields changed, emit a global event so pages can refresh
+        if (payload && (payload.type === 'skills' || payload.type === 'profile_fields')) {
+          try {
+            window.dispatchEvent(new CustomEvent('realtime:update', { detail: payload }));
+          } catch (e) {
+            // ignore
+          }
+          store.addNotification({
+            title: payload.type === 'skills' ? 'Skills Updated' : 'Profile Fields Updated',
+            message: payload.action ? `${payload.action} performed` : (payload.message || ''),
+            type: 'info',
+          });
+          return;
+        }
+
+        // convert payload to UserNotification shape for normal notifications
         store.addNotification({
           title: payload.title || 'Notification',
           message: payload.body || payload.message || '',

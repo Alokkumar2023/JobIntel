@@ -27,6 +27,8 @@ const navItems = [
   { icon: BarChart3, label: 'Analytics', path: '/admin/analytics' },
   { icon: CreditCard, label: 'Revenue', path: '/admin/revenue' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
+  { icon: Users, label: 'Profile Fields', path: '/admin/profile-fields' },
+  { icon: Briefcase, label: 'Skills', path: '/admin/skills' },
 ];
 
 export function AdminSidebar() {

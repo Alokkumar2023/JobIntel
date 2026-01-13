@@ -13,6 +13,9 @@ import notificationRoutes from "./routes/notification";
 import aiRoutes from "./routes/ai";
 import adminRoutes from "./routes/admin";
 import sourceAdminRoutes from "./routes/source";
+import userRoutes from './routes/user';
+import skillsRoutes from './routes/skills';
+import profileFieldsRoutes from './routes/profileFields';
 
 dotenv.config();
 const log = debug("jobintel:server");
@@ -33,8 +36,11 @@ app.use("/api/docs", openapiRoutes);
 app.use(seoRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use('/api/admin', sourceAdminRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/skills', skillsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/profile-fields', profileFieldsRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || "";

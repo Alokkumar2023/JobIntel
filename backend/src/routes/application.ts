@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createApplication, listApplications } from "../controllers/applicationController";
+import { createApplication, listApplications, deleteApplication } from "../controllers/applicationController";
 
 const router = Router();
 

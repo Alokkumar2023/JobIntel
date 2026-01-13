@@ -31,13 +31,16 @@ import { mockJobs } from '@/data/mockData';
 import { Job, JobType, ExperienceLevel } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { useJobsStore } from '@/store/jobsStore';
+import { useApplicationStore } from '@/store/applicationStore';
 
 const JobsPage = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { publishedJobs } = useJobsStore();
   
   const [backendJobs, setBackendJobs] = useState<any[]>([]);
-  const [userApplications, setUserApplications] = useState<Record<string, any>>({}); // jobId -> application
+  // use application store for realtime updates
+  const appStore = useApplicationStore();
+  const userApplications = appStore.applications;
   const [loadingJobs, setLoadingJobs] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,7 +98,7 @@ const JobsPage = () => {
       const apps = await res.json();
       const map: Record<string, any> = {};
       apps.forEach((a: any) => { if (a.jobId) map[String(a.jobId)] = a; });
-      setUserApplications(map);
+      appStore.setApplications(map);
     } catch (e) {
       console.warn('failed to fetch user applications', e);
     }
@@ -563,7 +566,7 @@ const JobsPage = () => {
                                   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                                   if (res.ok) {
                                     const a = await res.json();
-                                    setUserApplications((prev) => ({ ...prev, [String(job.id)]: a }));
+                                    appStore.addOrUpdateApplication(a);
                                   }
                                 } catch (e) { console.warn(e); }
                               }}
@@ -585,7 +588,7 @@ const JobsPage = () => {
                               const url = base ? `${base}/api/applications/${app._id}` : `/api/applications/${app._id}`;
                               const res = await fetch(url, { method: 'DELETE' });
                               if (res.ok) {
-                                setUserApplications((prev) => { const p = { ...prev }; delete p[job.id]; return p; });
+                                appStore.removeApplicationByJobId(String(job.id));
                               }
                             } catch (e) { console.warn(e); }
                           }}>Remove</Button>
